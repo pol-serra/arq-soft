@@ -12,7 +12,7 @@ class FileManager:
     def save_spreadsheet(self, spreadsheet: Spreadsheet):       
         with open(self.file_path, 'w') as file:
             for coordinate, cell in spreadsheet.cells.items():
-                file.write(f"{coordinate[0]}{coordinate[1]}={cell.get_value()}\n")
+                file.write(f"{coordinate[0]}{coordinate[1]}={cell.get_value(spreadsheet)}\n")
 
     # def load_spreadsheet(self) -> Spreadsheet:
     #     spreadsheet = Spreadsheet()
@@ -38,17 +38,19 @@ class FileManager:
         """Helper method to correctly split a row by semicolons, ignoring semicolons within functions"""
         parts = []
         current = ""
-        in_function = False
+        paren_count = 0
+
         for char in row:
-            if char == ';' and not in_function:
+            if char == ';' and paren_count == 0:
                 parts.append(current)
                 current = ""
             else:
                 if char == '(':
-                    in_function = True
+                    paren_count += 1
                 elif char == ')':
-                    in_function = False
+                    paren_count -= 1
                 current += char
+
         parts.append(current)
         return parts
 
@@ -78,5 +80,6 @@ class FileManager:
 
                     cell = Cell((col_letter, row_idx), content)
                     spreadsheet.add_cell((col_letter, row_idx), cell)
+
                         
         return spreadsheet

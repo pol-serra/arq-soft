@@ -45,6 +45,9 @@ class UserInterface:
             cell_content = TextContent(content)
         cell = Cell((col, row), cell_content)
         self.spreadsheet.add_cell((col, row), cell)
+        self.spreadsheet.update_graph()
+        if self.spreadsheet.detect_circular_dependencies():
+            print("there is a circular dependence")
 
     def display_cell_value(self):
         coord = input("Enter cell coordinate (e.g., A1): ")

@@ -1,6 +1,7 @@
 from cell import Cell
 from graph import Graph
 from formula import FormulaContent
+import re
 
 class Spreadsheet:
     def __init__(self):
@@ -42,6 +43,25 @@ class Spreadsheet:
     def update_dependent_cells(self, coordinate: tuple):
         # Implement logic to update dependent cells
         pass
+
+    def parse_formula(self, formula):
+        # Implementa la lógica para analizar la fórmula y extraer las referencias de celdas.
+        return re.findall(r'[A-Z]+\d+', formula)
+
+    def update_graph(self):
+        self.graph = Graph()
+        for cell_ref, cell in self.cells.items():
+            cell_ref_=cell_ref[0]+str(cell_ref[1])
+            if isinstance(cell.content, FormulaContent):
+                dependencies = self.parse_formula(cell.content.formula)
+                for dep in dependencies:
+                    self.graph.add_edge(dep, cell_ref_)
+
+    def detect_circular_dependencies(self):
+        if self.graph.has_cycle():
+            print("Hay dependencias circulares en la hoja de cálculo.")
+        else:
+            print("No hay dependencias circulares en la hoja de cálculo.")
 
 
 # # Example usage:

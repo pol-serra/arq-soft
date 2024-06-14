@@ -19,7 +19,7 @@ class NumericalOperand(Operand):
         self.numerical = numerical
 
     def get_value(self):
-        return self.numerical.get_number()
+        return self.numerical
 
 class CellOperand(Operand):
     def __init__(self, cell: 'Cell'):
@@ -55,7 +55,8 @@ class FormulaContent(Content):
             return True
 
     def is_function(self,s):
-        if re.match(r'SUMA\([^()]*\)|MIN\([^()]*\)|MAX\([^()]*\)|PROMEDIO\([^()]',s):
+        if re.match(r'SUMA\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|MIN\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|MAX\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|PROMEDIO\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|[A-Z]+\d+|\d+|[+\-*/()]',s) \
+            and not s=="+" and not s=="-" and not s=="*" and not s=="/":
             return True
 
     def peek(self,stack):
@@ -81,18 +82,86 @@ class FormulaContent(Content):
         precedences = {'+' : 0, '-' : 0, '*' : 1, '/' : 1}
         return precedences[op1] > precedences[op2]
 
+    def tokenizer(self,formula):
+        import re
+        # Define the token specification
+        TOKEN_SPECIFICATION = [
+            ('FUNC',      r'SUMA|MIN|MAX|PROMEDIO'),  # Functions
+            ('NUMBER',    r'\d+(\.\d*)?'),            # Integer or decimal number
+            ('PLUS',      r'\+'),                     # Addition operator
+            ('MINUS',     r'-'),                      # Subtraction operator
+            ('TIMES',     r'\*'),                     # Multiplication operator
+            ('DIVIDE',    r'/'),                      # Division operator
+            ('LPAREN',    r'\('),                     # Left parenthesis
+            ('RPAREN',    r'\)'),                     # Right parenthesis
+            ('SEMI',      r';'),                      # Semicolon as argument separator
+            ('CELL',      r'[A-Z]+\d+'),              # Cell reference
+            ('SKIP',      r'[ \t]+'),                 # Skip over spaces and tabs
+            ('MISMATCH',  r'.'),                      # Any other character
+        ]
+
+        TOKEN_REGEX = '|'.join('(?P<%s>%s)' % pair for pair in TOKEN_SPECIFICATION)
+        tokens = []
+        pos = 0
+        length = len(formula)
+        
+        while pos < length:
+            match = re.match(TOKEN_REGEX, formula[pos:])
+            if not match:
+                raise RuntimeError(f'Caracter inesperado {formula[pos]} en {formula}')
+            kind = match.lastgroup
+            value = match.group(kind)
+            
+            if kind == 'NUMBER':
+                value = float(value) if '.' in value else int(value)
+                tokens.append((kind, value))
+            elif kind == 'SKIP':
+                pos += match.end() - match.start()
+                continue  # Ignore spaces and tabs
+            elif kind == 'MISMATCH':
+                raise RuntimeError(f'{value!r} inesperado en {formula}')
+            elif kind == 'FUNC':
+                func_tokens, new_pos = self._parse_function(pos)
+                tokens.append((kind,func_tokens))
+                pos = new_pos
+                continue
+            else:
+                tokens.append((kind, value))
+            pos += match.end() - match.start()
+        
+        return tokens
+
+
+    def _parse_function(self, start_pos):
+        end_pos = start_pos
+        paren_count = 0
+        func_str = ""
+        while end_pos < len(self.formula):
+            char = self.formula[end_pos]
+            func_str += char
+            if char == '(':
+                paren_count += 1
+            elif char == ')':
+                paren_count -= 1
+                if paren_count == 0:
+                    break
+            end_pos += 1
+        
+        return (func_str, end_pos + 1)
+
     def evaluate(self, spreadsheet: 'Spreadsheet'):
         """
         Evaluates a mathematical expression using the Shunting Yard Algorithm.
         """
-        tokens = re.findall(r'[A-Z]+\d+|\d+|\+|\-|\*|\/|\(|\)|SUMA\([^()]*\)|MIN\([^()]*\)|MAX\([^()]*\)|PROMEDIO\([^()]*\)', self.formula)
+        #tokens = re.findall(r'[A-Z]+\d+|\d+|\+|\-|\*|\/|\(|\)|SUMA\([^()]*\)|MIN\([^()]*\)|MAX\([^()]*\)|PROMEDIO\([^()]*\)', self.formula)
+        tokens = self.tokenizer(self.formula)
         values, operators = [], []
         for token in tokens:
-            if self.is_number(token):
-                operand = Operand().create_operand('numerical',float(token))
+            if token[0]=='NUMBER':
+                operand = Operand().create_operand('numerical',float(token[1]))
                 values.append(operand.get_value())
-            elif self.is_cell_reference(token):
-                coincidence = re.match(r"([A-Z]+)(\d+)",token)
+            elif token[0]=='CELL':
+                coincidence = re.match(r"([A-Z]+)(\d+)",token[1])
                 if coincidence:
                     col = coincidence.group(1)
                     row = int(coincidence.group(2))
@@ -100,23 +169,23 @@ class FormulaContent(Content):
                     raise ValueError(f"Token no válido: {token}")
                 operand = Operand().create_operand('cell',spreadsheet.get_cell((col,row)))
                 values.append(operand.get_value(spreadsheet))
-            elif self.is_function(token):
-                if token.startswith("SUMA"): operand = Operand().create_operand('function','SUMA')
-                if token.startswith("MIN"): operand = Operand().create_operand('function','MIN')
-                if token.startswith("MAX"): operand = Operand().create_operand('function','MAX')
-                if token.startswith("PROMEDIO"): operand = Operand().create_operand('function','PROMEDIO')
-                operand.set_arguments_from_formula(token,spreadsheet)
+            elif token[0]=='FUNC':
+                if token[1].startswith("SUMA"): operand = Operand().create_operand('function','SUMA')
+                elif token[1].startswith("MIN"): operand = Operand().create_operand('function','MIN')
+                elif token[1].startswith("MAX"): operand = Operand().create_operand('function','MAX')
+                elif token[1].startswith("PROMEDIO"): operand = Operand().create_operand('function','PROMEDIO')
+                operand.set_arguments_from_formula(token[1],spreadsheet)
                 values.append(operand.get_value(spreadsheet))
-            elif token == '(':
-                operators.append(token)
-            elif token == ')':
+            elif token[0] == 'LPAREN':
+                operators.append(token[1])
+            elif token[0] == 'RPAREN':
                 while self.peek(operators) and self.peek(operators) != '(':
                     self.apply_operator(operators, values)
                 operators.pop() # Discard the '('
             else:
-                while self.peek(operators) and self.peek(operators) not in "()" and self.greater_precedence(self.peek(operators), token):
+                while self.peek(operators) and self.peek(operators) not in "()" and self.greater_precedence(self.peek(operators), token[1]):
                     self.apply_operator(operators, values)
-                operators.append(token)
+                operators.append(token[1])
         while self.peek(operators):
             self.apply_operator(operators, values)
         return values[0]
@@ -145,35 +214,83 @@ class FunctionOperand(Operand):
     def add_argument(self, argument: 'Argument'):
         self.arguments.append(argument)
 
+    @staticmethod
+    def parse_function(function):
+    # Extract the function name
+        match = re.match(r'([A-Z]+)\((.*)\)', function)
+        if not match:
+            raise ValueError(f"Invalid formula: {function}")
+
+        name, arguments_str = match.groups()
+
+        # Parse the arguments while handling nested functions
+        def extract_arguments(arg_str):
+            args = []
+            nested_level = 0
+            current_arg = []
+            
+            for char in arg_str:
+                if char == '(':
+                    nested_level += 1
+                elif char == ')':
+                    nested_level -= 1
+                if char == ';' and nested_level == 0:
+                    args.append(''.join(current_arg).strip())
+                    current_arg = []
+                else:
+                    current_arg.append(char)
+            
+            # Add the last argument
+            if current_arg:
+                args.append(''.join(current_arg).strip())
+
+            return args
+
+        arguments = extract_arguments(arguments_str)
+        return arguments
+
     def set_arguments_from_formula(self, function: str, spreadsheet: 'Spreadsheet' = None):
         """
         Extract and set arguments from the formula string.
         """
         # Extract arguments from the formula string (e.g., SUMA(A1;2;3;A1:A2))
         # Split the formula by the function name and parenthesis
-        function_parts = function.split(self.name + '(')
-        if len(function_parts) != 2:
-            raise ValueError(f"Invalid formula: {function}")
-        # Extract the arguments part (e.g., A1;2;3;A1:A2)
-        arguments_str = function_parts[1].rstrip(')')
-        # Split the arguments by ';' and trim whitespace
-        arguments = [arg.strip() for arg in arguments_str.split(',')]
-        # Create Argument instances based on the argument type
+        arguments = self.parse_function(function)
         for arg in arguments:
-            print(arg)
-            coincidence = re.match(r"([A-Z]+)(\d+)",arg)
-            if coincidence:
+            if re.match(r'^[A-Z]+[0-9]+:[A-Z]+[0-9]+$', arg):
+                argument = Argument.create("Range",self.name)
+                range_cells = arg.split(":")
+                argument.set_range(range_cells[0], range_cells[1], spreadsheet)
+            elif re.match(r'SUMA\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|'
+                        r'MIN\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|'
+                        r'MAX\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|'
+                        r'PROMEDIO\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|'
+                        r'[A-Z]+\d+|'
+                        r'[+\-*/()]', arg):
+                if arg.startswith("SUMA"):
+                    operand = Operand().create_operand('function', 'SUMA')
+                elif arg.startswith("MIN"):
+                    operand = Operand().create_operand('function', 'MIN')
+                elif arg.startswith("MAX"):
+                    operand = Operand().create_operand('function', 'MAX')
+                elif arg.startswith("PROMEDIO"):
+                    operand = Operand().create_operand('function', 'PROMEDIO')
+                operand.set_arguments_from_formula(arg, spreadsheet)
+                argument = Argument.create("Function", operand)
+            elif re.match(r'[A-Z]+\d+', arg):
+                coincidence = re.match(r"([A-Z]+)(\d+)", arg)
                 col = coincidence.group(1)
                 row = int(coincidence.group(2))
+                argument = Argument.create("Cell", spreadsheet.get_cell((col, row)))
+            elif re.match(r'^[+\-]?\d*\.?\d+$', arg):
+                argument = Argument.create("Numerical", float(arg))
             else:
-                raise ValueError(f"Token no válido: {arg}")
-            if re.match(r'[A-Z]+\d+', arg):
-                argument=Argument.create("Cell",spreadsheet.get_cell((col,row)))
-            elif float(arg):
-                argument=Argument.create("Numerical",float(arg))
-            else: 
-                argument=Argument.create("Range",arg)
-            self.arguments.append(argument)
+                # Handle unrecognized arguments
+                argument = None
+            
+            if argument:
+                self.arguments.append(argument)
+
 
     def calculate(self,spreadsheet):
         # Simplified function logic
@@ -220,28 +337,90 @@ class Argument:
             return NumericalArgument(*args, **kwargs)
         elif argument_type == "Cell":
             return CellArgument(*args, **kwargs)
-        #elif argument_type == "Function":
-
+        elif argument_type == "Function":
+            return FunctionArgument(*args, **kwargs)
         else:
             raise ValueError("Invalid argument type")
 
     def get_value(self):
         raise NotImplementedError("Subclasses should implement this method")
 
-
 class RangeArgument(Argument):
-    def __init__(self, cells: list):
-        self.cells = cells
+    def __init__(self,type_of_function):
+        self.cells = []
+        self.type_function=type_of_function
 
-    def get_value(self):
-        return sum(cell.get_value() for cell in self.cells)  # Simplified
+    def set_range(self, start_cell, end_cell, spreadsheet):
+        start_col, start_row = self._parse_cell(start_cell)
+        end_col, end_row = self._parse_cell(end_cell)
+
+        # Ensure start cell is before or same as end cell
+        if start_col > end_col or start_row > end_row:
+            raise ValueError("Start cell must be before or same as end cell")
+
+        self.cells = []
+
+        for col in range(start_col, end_col + 1):
+            col_letter = self._index_to_col_str(col)
+            for row in range(start_row, end_row + 1):
+                cell_ref = f"{col_letter}{row}"
+                cell = spreadsheet.get_cell((col_letter,row))
+                if cell:
+                    self.cells.append(cell)
+
+    def get_value(self,spreadsheet):
+        # Example implementation, return some value
+        if self.type_function == 'SUMA':
+            return sum(cell.get_value(spreadsheet) for cell in self.cells)
+        elif self.type_function == 'MIN':
+            return min(cell.get_value(spreadsheet) for cell in self.cells)
+        elif self.type_function == 'MAX':
+            return max(cell.get_value(spreadsheet) for cell in self.cells)
+        elif self.type_function == 'PROMEDIO':
+            values = [cell.get_value(spreadsheet) for cell in self.cells]
+            return sum(values) / len(values) if values else 0
+
+    def _parse_cell(self, cell):
+        col_str = ""
+        row_str = ""
+        for char in cell:
+            if char.isalpha():
+                col_str += char
+            elif char.isdigit():
+                row_str += char
+        col = self._col_str_to_index(col_str)
+        row = int(row_str)
+        return col, row
+
+    def _col_str_to_index(self, col_str):
+        base = ord('A')
+        col_num = 0
+        for char in col_str:
+            col_num = col_num * 26 + (ord(char) - base + 1)
+        return col_num - 1
+
+    def _index_to_col_str(self, col):
+        result = ""
+        while col >= 0:
+            result = chr(col % 26 + ord('A')) + result
+            col = col // 26 - 1
+        return result
+
+
+
+class FunctionArgument(Argument):
+    def __init__(self, function: 'FunctionOperand'):
+        self.function = function
+
+    def get_value(self,spreadsheet):
+        return self.function.get_value(spreadsheet)  # Simplified
 
 
 class NumericalArgument(Argument):
     def __init__(self, number: float):
         self.number = number
 
-    def get_value(self):
+    def get_value(self,spreadsheet):
         return self.number
 
 

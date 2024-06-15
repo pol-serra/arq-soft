@@ -1,6 +1,6 @@
 from content import Content, NumericalContent
 import re
-
+from entities.content_exception import ContentException
 
 class Operand:
     @staticmethod
@@ -108,7 +108,7 @@ class FormulaContent(Content):
         while pos < length:
             match = re.match(TOKEN_REGEX, formula[pos:])
             if not match:
-                raise RuntimeError(f'Caracter inesperado {formula[pos]} en {formula}')
+                raise ContentException(f'Caracter inesperado {formula[pos]} en {formula}')
             kind = match.lastgroup
             value = match.group(kind)
             
@@ -261,6 +261,11 @@ class FunctionOperand(Operand):
                 argument = Argument.create("Range",self.name)
                 range_cells = arg.split(":")
                 argument.set_range(range_cells[0], range_cells[1], spreadsheet)
+            elif re.match(r'[A-Z]+\d+', arg):
+                coincidence = re.match(r"([A-Z]+)(\d+)", arg)
+                col = coincidence.group(1)
+                row = int(coincidence.group(2))
+                argument = Argument.create("Cell", spreadsheet.get_cell((col, row)))
             elif re.match(r'SUMA\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|'
                         r'MIN\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|'
                         r'MAX\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)|'
@@ -277,11 +282,6 @@ class FunctionOperand(Operand):
                     operand = Operand().create_operand('function', 'PROMEDIO')
                 operand.set_arguments_from_formula(arg, spreadsheet)
                 argument = Argument.create("Function", operand)
-            elif re.match(r'[A-Z]+\d+', arg):
-                coincidence = re.match(r"([A-Z]+)(\d+)", arg)
-                col = coincidence.group(1)
-                row = int(coincidence.group(2))
-                argument = Argument.create("Cell", spreadsheet.get_cell((col, row)))
             elif re.match(r'^[+\-]?\d*\.?\d+$', arg):
                 argument = Argument.create("Numerical", float(arg))
             else:
@@ -370,15 +370,32 @@ class RangeArgument(Argument):
 
     def get_value(self,spreadsheet):
         # Example implementation, return some value
+        # if self.type_function == 'SUMA':
+        #     return sum(cell.get_value(spreadsheet) if cell else 0 for cell in self.cells)
+        # elif self.type_function == 'MIN':
+        #     return min(cell.get_value(spreadsheet) if cell else 0 for cell in self.cells)
+        # elif self.type_function == 'MAX':
+        #     return max(cell.get_value(spreadsheet) if cell else 0 for cell in self.cells)
+        # elif self.type_function == 'PROMEDIO':
+        #     values = [cell.get_value(spreadsheet) if cell else 0 for cell in self.cells]
+        #     return sum(values) / len(values) if values else 0
         if self.type_function == 'SUMA':
-            return sum(cell.get_value(spreadsheet) for cell in self.cells)
+            values = [cell.get_value(spreadsheet) if cell else 0 for cell in self.cells]
+            return sum(values)
         elif self.type_function == 'MIN':
-            return min(cell.get_value(spreadsheet) for cell in self.cells)
+            values = [cell.get_value(spreadsheet) if cell else None for cell in self.cells]
+            values = [value for value in values if value is not None]  # Elimina los valores None
+            return min(values) if values else 0  # Retorna 0 si values está vacío
         elif self.type_function == 'MAX':
-            return max(cell.get_value(spreadsheet) for cell in self.cells)
+            values = [cell.get_value(spreadsheet) if cell else None for cell in self.cells]
+            values = [value for value in values if value is not None]  # Elimina los valores None
+            return max(values) if values else 0  # Retorna 0 si values está vacío
         elif self.type_function == 'PROMEDIO':
-            values = [cell.get_value(spreadsheet) for cell in self.cells]
-            return sum(values) / len(values) if values else 0
+            values = [cell.get_value(spreadsheet) if cell else 0 for cell in self.cells]
+            values = [value for value in values if value is not None]  # Elimina los valores None
+            return sum(values) / len(values) if values else 0  # Retorna 0 si values está vacío
+        else:
+            return 0  # Manejo para otros tipos de función no definidos
 
     def _parse_cell(self, cell):
         col_str = ""

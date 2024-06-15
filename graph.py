@@ -64,6 +64,13 @@ class Graph:
         for from_cell, to_cells in self.edges.items():
             result += f"{from_cell} -> {', '.join(to_cells)}\n"
         return result
+    
+    def copy(self):
+        new_graph = Graph()
+        new_graph.nodes = self.nodes.copy()
+        new_graph.edges = {node: edges.copy() for node, edges in self.edges.items()}
+        return new_graph
+    
 
 # Example usage
 if __name__ == "__main__":

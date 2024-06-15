@@ -58,15 +58,23 @@ class Spreadsheet:
                     self.graph.add_edge(dep, cell_ref_)
 
     def detect_circular_dependencies(self):
-        if self.graph.has_cycle():
-            print("Hay dependencias circulares en la hoja de cálculo.")
-        else:
-            print("No hay dependencias circulares en la hoja de cálculo.")
+        return self.graph.has_cycle()
+    
+
+    def can_add_cell_without_cycle(self, coordinate: tuple, cell_content) -> bool:
+        temp_graph = Graph()
+        temp_graph.nodes = self.dependency_graph.nodes.copy()
+        temp_graph.edges = {node: edges.copy() for node, edges in self.dependency_graph.edges.items()}
+        coordinate_str = coordinate[0] + str(coordinate[1])
+        if isinstance(cell_content, FormulaContent):
+            dependencies = self.parse_formula(cell_content.formula)
+            for dep in dependencies:
+                temp_graph.add_edge(dep, coordinate_str)
+
+        return not temp_graph.has_cycle()
 
 
-# # Example usage:
-# if __name__ == "__main__":
-#     spreadsheet = Spreadsheet()
-#     cell = Cell(("A", 1), NumericalContent(42.0))
-#     spreadsheet.add_cell(("A", 1), cell)
-#     print(spreadsheet.get_cell(("A", 1)).get_value())  # Output: 42.0
+
+
+
+

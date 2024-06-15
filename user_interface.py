@@ -3,6 +3,7 @@ from formula import FormulaContent
 from file_manager import FileManager
 from cell import Cell
 import re
+from entities.circular_dependency_exception import CircularDependencyException
 
 class UserInterface:
     def __init__(self, spreadsheet: 'Spreadsheet'):
@@ -38,16 +39,19 @@ class UserInterface:
         content = input("Enter cell content: ")
         col, row = coord[0], int(coord[1:])
         if content.startswith('='):
-            cell_content = FormulaContent(content)
+            cell_content = FormulaContent(content[1:])
         elif content.isdigit():
             cell_content = NumericalContent(float(content))
         else:
             cell_content = TextContent(content)
         cell = Cell((col, row), cell_content)
-        self.spreadsheet.add_cell((col, row), cell)
-        self.spreadsheet.update_graph()
-        if self.spreadsheet.detect_circular_dependencies():
-            print("there is a circular dependence")
+        if self.spreadsheet.can_add_cell_without_cycle((col,row),cell):
+            self.spreadsheet.add_cell((col, row), cell)
+            self.spreadsheet.update_graph()
+            if self.spreadsheet.detect_circular_dependencies(): raise CircularDependencyException("hi")
+        else:
+            raise CircularDependencyException("New cell inccur in a Circular dependency, so has not been updated")
+        pass
 
     def display_cell_value(self):
         coord = input("Enter cell coordinate (e.g., A1): ")

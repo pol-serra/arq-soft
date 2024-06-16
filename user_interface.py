@@ -4,6 +4,7 @@ from file_manager import FileManager
 from cell import Cell
 import re
 from entities.circular_dependency_exception import CircularDependencyException
+from entities.bad_coordinate_exception import BadCoordinateException
 
 class UserInterface:
     def __init__(self, spreadsheet: 'Spreadsheet'):
@@ -22,7 +23,7 @@ class UserInterface:
             self.display_menu()
             choice = input("Select an option: ")
             if choice == "1":
-                self.add_update_cell()
+                self.add_update_cell()    
             elif choice == "2":
                 self.display_cell_value()
             elif choice == "3":
@@ -49,6 +50,7 @@ class UserInterface:
             self.spreadsheet.add_cell((col, row), cell)
             self.spreadsheet.update_graph()
             if self.spreadsheet.detect_circular_dependencies(): raise CircularDependencyException("hi")
+            self.spreadsheet.print_spreadsheet()
         else:
             raise CircularDependencyException("New cell inccur in a Circular dependency, so has not been updated")
         pass
@@ -60,7 +62,7 @@ class UserInterface:
             col = coincidence.group(1)
             row = int(coincidence.group(2))
         else:
-            raise ValueError(f"Celda no válida: {coord}")
+            raise BadCoordinateException(f"Celda no válida: {coord}")
         col, row = coord[0], int(coord[1:])
         cell = self.spreadsheet.get_cell((col, row))
         if cell:
@@ -76,4 +78,5 @@ class UserInterface:
     def load_spreadsheet(self):
         file_path = input("Enter file path to load: ")
         self.spreadsheet = FileManager(file_path).load_spreadsheet()
+        self.spreadsheet.print_spreadsheet()
         print("Spreadsheet loaded.")

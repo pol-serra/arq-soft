@@ -99,13 +99,13 @@ class FormulaContent(Content):
             ('SKIP',      r'[ \t]+'),                 # Skip over spaces and tabs
             ('MISMATCH',  r'.'),                      # Any other character
         ]
-
         TOKEN_REGEX = '|'.join('(?P<%s>%s)' % pair for pair in TOKEN_SPECIFICATION)
         tokens = []
         pos = 0
         length = len(formula)
         
         while pos < length:
+
             match = re.match(TOKEN_REGEX, formula[pos:])
             if not match:
                 raise ContentException(f'Caracter inesperado {formula[pos]} en {formula}')
@@ -119,7 +119,7 @@ class FormulaContent(Content):
                 pos += match.end() - match.start()
                 continue  # Ignore spaces and tabs
             elif kind == 'MISMATCH':
-                raise RuntimeError(f'{value!r} inesperado en {formula}')
+                raise ContentException(f'Formula incorrecta {formula[pos]} en {formula}')
             elif kind == 'FUNC':
                 func_tokens, new_pos = self._parse_function(pos)
                 tokens.append((kind,func_tokens))
@@ -369,16 +369,6 @@ class RangeArgument(Argument):
                     self.cells.append(cell)
 
     def get_value(self,spreadsheet):
-        # Example implementation, return some value
-        # if self.type_function == 'SUMA':
-        #     return sum(cell.get_value(spreadsheet) if cell else 0 for cell in self.cells)
-        # elif self.type_function == 'MIN':
-        #     return min(cell.get_value(spreadsheet) if cell else 0 for cell in self.cells)
-        # elif self.type_function == 'MAX':
-        #     return max(cell.get_value(spreadsheet) if cell else 0 for cell in self.cells)
-        # elif self.type_function == 'PROMEDIO':
-        #     values = [cell.get_value(spreadsheet) if cell else 0 for cell in self.cells]
-        #     return sum(values) / len(values) if values else 0
         if self.type_function == 'SUMA':
             values = [cell.get_value(spreadsheet) if cell else 0 for cell in self.cells]
             return sum(values)

@@ -68,25 +68,25 @@ class FileManager:
                     if not col_num_== col_num:file.write(";")
                 file.write("\n")
 
-    def split_row(self, row):
-        """Helper method to correctly split a row by semicolons, ignoring semicolons within functions"""
-        parts = []
-        current = ""
-        paren_count = 0
+    # def split_row(self, row):
+    #     """Helper method to correctly split a row by semicolons, ignoring semicolons within functions"""
+    #     parts = []
+    #     current = ""
+    #     paren_count = 0
 
-        for char in row:
-            if char == ';' and paren_count == 0:
-                parts.append(current)
-                current = ""
-            else:
-                if char == '(':
-                    paren_count += 1
-                elif char == ')':
-                    paren_count -= 1
-                current += char
+    #     for char in row:
+    #         if char == ';' and paren_count == 0:
+    #             parts.append(current)
+    #             current = ""
+    #         else:
+    #             if char == '(':
+    #                 paren_count += 1
+    #             elif char == ')':
+    #                 paren_count -= 1
+    #             current += char
 
-        parts.append(current)
-        return parts
+    #     parts.append(current)
+    #     return parts
 
     def load_spreadsheet(self) -> Spreadsheet:
         spreadsheet = Spreadsheet()

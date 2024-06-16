@@ -24,18 +24,5 @@ class Cell:
         return self.content.get_value(spreadsheet) if self.content else None
 
 
-# Example usage:
-if __name__ == "__main__":
-    text_content = TextContent("Example text")
-    cell = Cell(("A", 1), text_content)
-    print(text_content.get_cell().get_coordinate())  # Output: ("A", 1)
 
-    numerical_content = NumericalContent(42.0)
-    cell.set_content(numerical_content)
-    print(cell.get_value())  # Output: 42.0
-    print(numerical_content.get_cell().get_coordinate())  # Output: ("A", 1)
 
-    # Test with FormulaContent
-    formula_content = FormulaContent("=3+5", None)  # `None` is used instead of a spreadsheet instance for simplicity
-    cell.set_content(formula_content)
-    print(cell.get_value())

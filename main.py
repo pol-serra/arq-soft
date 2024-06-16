@@ -1,5 +1,5 @@
 from spreadsheet import Spreadsheet
-from user_interface import UserInterface
+from user_interface_ import UserInterface
 
 def main():
     spreadsheet = Spreadsheet()

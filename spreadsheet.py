@@ -23,9 +23,9 @@ class Spreadsheet:
 
     def print_spreadsheet(self):
         # Create a sorted list of cell coordinates
-        sorted_coords = sorted(self.cells.keys(), key=lambda x: (int(x[1:]), x[0]))
+        sorted_coords = sorted(self.cells.keys())
         # Extract row and column labels
-        rows = sorted(set(int(coord[1:]) for coord in sorted_coords))
+        rows = sorted(set(int(coord[1]) for coord in sorted_coords))
         cols = sorted(set(coord[0] for coord in sorted_coords))
 
         # Print column headers
@@ -33,7 +33,7 @@ class Spreadsheet:
         for row in rows:
             # Print row headers and cell values
             row_cells = [self.cells.get(col + str(row), Cell(col + str(row), "")).content for col in cols]
-            row_values = [self.compute_cell(col + str(row)) if col + str(row) in self.cells else '' for col in cols]
+            row_values = [self.get_cell((col,row)).get_content().get_value(self) if (col,row) in self.cells else '' for col in cols]
             print(f"{row}\t" + "\t".join(str(value) for value in row_values))
 
     def calculate_all(self):

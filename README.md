@@ -1,8 +1,8 @@
-# Software Project
+# ARQ SOFT PROJECT
 
 ## Recent Updates
 
-Since the last delivery, the following updates have been made to the following documents::
+Since the last delivery, the following updates have been made to the following documents:
 
 1. **Domain Model**
 2. **Design Class Diagram**

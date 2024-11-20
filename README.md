@@ -39,3 +39,9 @@ The project covers the complete software development lifecycle:
    ```bash
    git clone https://github.com/yourusername/spreadsheet-app.git
 
+2. Run the application:
+  ```bash
+  python main.py
+
+
+
